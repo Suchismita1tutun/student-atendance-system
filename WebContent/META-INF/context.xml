@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context path="/Student_Attendance_System" antiJARLocking="true">
+ <Resource url="jdbc:oracle:thin:@localhost:1521:orcl" type="javax.sql.DataSource" password="suchismita" username="suchismita" name="jdbc/iem"
+  maxWait="-1" maxActive="100" maxIdle="10" driverClassName="oracle.jdbc.OracleDriver" auth="Container">
+  </Resource>
+</Context>

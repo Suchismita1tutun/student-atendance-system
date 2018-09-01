@@ -1,0 +1,402 @@
+create user suchismita identified by suchismita account unlock;
+grant dba to suchismita;
+ conn
+Enter user-name: suchismita/suchismita
+
+Create table department (dept_no NUMBER, dept_name VARCHAR2(55),
+Constraints dept_deptno_pk primary key(dept_no),
+Constraints dept_deptname_ch check(dept_name is not null)); 
+
+Create table department_section(dept_no NUMBER,sec char(1),year varchar2(10) not null,
+Constraints dept_sec_deptno_pk primary key(dept_no,sec,year),
+Constraints dept_sec_fk foreign key(dept_no) references department(dept_no) on delete cascade);  
+
+Create table teacher (id NUMBER, name varchar2(100),degree varchar2(150),dept_no NUMBER, join_date Date,email_id varchar2(65) unique,
+phone_no char(10),
+address varchar2(150),
+Constraints teacher_id_pk primary key(id),
+Constraints teacher_name_ck check(name is not null),
+Constraints teacher_degree_ck check(degree is not null),
+Constraints teacher_address_ck check(address is not null),
+Constraints teacher_deptno_fk foreign key(dept_no ) references department(dept_no) on delete cascade);
+
+
+
+create table subject (sub_code varchar2(12),name varchar2(55),dept_no NUMBER,sub_type varchar2(12) ,
+Constraints subject_code_pk primary key(sub_code),
+Constraints subject_name_ck check(name is not null),
+Constraints subject_deptno_fk foreign key(dept_no) references department(dept_no) on delete cascade);
+
+
+create table student(enroll NUMBER(12),
+first_name varchar2(55),
+last_name varchar2(55),
+year varchar2(10),
+sec char(1),dob Date,phone_no char(12),
+email_id varchar2(55) unique,
+address varchar2(100),
+dept_no NUMBER,
+Constraints student_enroll_pk primary key(enroll),
+Constraints student_name_ck check(first_name is not null),
+Constraints student_year_ck check(year is not null),
+Constraints student_sec_ck check(sec is not null),
+Constraints student_dob_ck check(dob is not null),
+Constraints student_address_ck check(address is not null),
+Constraints student_deptsec_fk foreign key(dept_no,sec,year) references department_section(dept_no,sec,year) on delete cascade);
+
+
+create table teacher_schedule(
+seq NUMBER,
+tid NUMBER,
+sub_code varchar2(12),
+Constraints schedule_seq_pk primary key(seq),
+Constraints schedule_id_fk foreign key(tid) references teacher(id) on delete cascade,
+Constraints schedule_subcode_fk foreign key(sub_code) references subject(sub_code) on delete cascade
+ );
+
+
+create table department_schedule(
+dept_seq NUMBER,
+year varchar2(10),
+sec char(1),
+dept_no NUMBER,
+Constraints department_schedule_deptseq_pk primary key(dept_seq),
+Constraints department_schedule_deptno_fk foreign key(dept_no,sec,year) references department_section(dept_no,sec,year) on delete cascade,
+Constraints department_schedule_year_ck check(year is not null));
+
+
+
+create table timetable(
+teach_seq NUMBER,
+dept_seq NUMBER,
+day varchar2(20) ,  
+period INTEGER not null,
+start_time timestamp not null,
+end_time  timestamp not null,
+Constraints timetable_time_day_ck check (day in ( 'MONDAY'  ,  'TUESDAY' , 'WEDNESDAY' , 'THURSDAY' , 'FRIDAY' , 'SATURDAY' )),
+Constraints timetable_dept_seq_fk foreign key(dept_seq) references department_schedule(dept_seq) on delete cascade,
+Constraints timetable_teach_seq_fk foreign key(teach_seq) references teacher_schedule(seq) on delete cascade);
+
+
+
+create table attendance_time (
+date_seq NUMBER,
+class_date Date ,
+start_time timestamp,
+end_time timestamp ,
+Constraints attendance_seq_pk primary  key(date_seq),
+Constraints attendance_classdate_ck check(class_date is not null));
+
+
+create table student_attendance_list (
+teach_seq NUMBER ,
+attend_seq NUMBER ,
+enroll NUMBER(12) ,
+status NUMBER(1)  default 0 ,
+Constraints attendance_list_tseq_fk foreign key(teach_seq) references teacher_schedule(seq) on delete cascade,
+Constraints attendance_list_attseq_fk foreign key(attend_seq) references attendance_time(date_seq) on delete cascade,
+Constraints attendance_list_enroll_fk foreign key(enroll) references student(enroll) on delete cascade);
+
+
+
+
+create table routine_temp(day varchar2(20) primary key , period1 period,period2 period,
+period3 period,period4 period,period5 period,period6 period);
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  SEQUENCE CREATION:
+ create sequence dept_no_seq start with 1 increment by 1;
+ create sequence teacher_schedule_seq start with 1 increment by 1;
+ create sequence department_schedule_seq start with 1 increment by 1;
+ create sequence attendance_list_seq start with 1 increment by 1;
+create sequence teacher_seq start with 1000 increment by 1;
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TRIGGER CREATION:
+1. create or replace trigger department_trigger before  insert on department for each row
+begin
+:new.dept_no:=dept_no_seq.nextval; 
+end;
+
+
+2 . create or replace trigger teacher_schedule_trigger before insert on teacher_schedule for each row
+begin
+:new.seq:=teacher_schedule_seq.nextval;
+end;
+3. create or replace trigger department_schedule_trigger before insert on department_schedule for each row
+begin
+:new.dept_seq:=department_schedule_seq.nextval;
+end;
+4. create or replace trigger attendance_time_trigger before insert on attendance_time for each row
+begin
+:new.date_seq:=attendance_list_seq.nextval;
+end;
+5. create or replace trigger teacher_insert_trigger before insert on teacher for each row
+begin
+:new.id:=teacher_seq.nextval;
+end;
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TYPE CREATION:
+
+create or replace type number_array as table of NUMBER(12);
+create or replace type period As object
+(
+name varchar2(100),
+subname varchar2(220),
+sub_type varchar2(12),
+dname varchar2(15),
+year varchar2(12),
+sec char(2),
+start_time timestamp,
+end_time timestamp
+);
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PACKAGE CREATION:
+1.  create or replace package  STUDENT_ATTENDANCE_PACKAGE
+Is
+procedure give_attendance(id teacher.id%type,sub_ccode subject.sub_code%type,enroll_array  number_array,
+class_date Date ,start_time timestamp,end_time timestamp);
+
+procedure get_attendance(dname department.dept_name%type,nyear department_section.year%type ,
+nsec department_section.sec%type,subcode subject.sub_code%type,attendance out sys_refcursor);
+ procedure execute_attendancedate_qry(classdate Date ,starttime timestamp,endtime timestamp,time_sqnc out NUMBER);
+end;
+
+
+
+2 . create or replace package STUDENT_ROUTINE_PACKAGE
+As
+
+procedure getClassRoutine(dname department.dept_name%type,nyear department_section.year%type ,nsec department_section.sec%type,routine out sys_refcursor);
+
+procedure update_routine(tname teacher.name%type,subject subject.name%type,sub_type subject.sub_type%type,dname department.dept_name%type,year department_section.year%type ,sec department_section.sec%type,start_time timestamp,end_time timestamp,perio Integer,dayt varchar2);
+
+procedure insert_routine(tname teacher.name%type,sub_ccode subject.sub_code%type,dname department.dept_name%type,nyear department_section.year%type ,nsec department_section.sec%type,
+day timetable.day%type ,  
+period timetable.period%type,
+start_time timetable.start_time%type ,
+end_time timetable.end_time%type) ;
+
+procedure getClassRoutine(tname teacher.name%type , routine out sys_refcursor);
+procedure execute_teacher_qry(ttid teacher.id%type, sub_ccode subject.sub_code%type, no out integer);
+procedure execute_department_qry(nyear department_section.year%type ,nsec department_section.sec%type,dpt_no NUMBER, no out integer);
+
+end;
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PACKAGE BODY CREATION
+
+create or replace package  body STUDENT_ATTENDANCE_PACKAGE
+Is
+
+
+procedure execute_attendancedate_qry(classdate Date ,starttime timestamp,endtime timestamp,time_sqnc out NUMBER) As
+
+begin
+select date_seq into time_sqnc from attendance_time where class_date=classdate and start_time=starttime and end_time=endtime;
+EXCEPTION
+when no_data_found then
+time_sqnc:=0;
+end;
+
+--PROCEDURE FOR ATTENDANCE 
+procedure give_attendance(id teacher.id%type,sub_ccode subject.sub_code%type,enroll_array  number_array,
+class_date Date ,start_time timestamp,end_time timestamp) As
+sqnc NUMBER;
+time_sqnc NUMBER:=0;
+begin
+select seq into sqnc from teacher_schedule where tid=id and sub_code=sub_ccode;
+execute_attendancedate_qry(class_date,start_time ,end_time ,time_sqnc);
+if(time_sqnc=0) then
+ insert into attendance_time (class_date ,start_time ,end_time) values( class_date   ,   start_time  ,  end_time ) ;
+time_sqnc:=attendance_list_seq.currval;
+end if;
+
+for i in 1..enroll_array.count 
+loop
+ insert into student_attendance_list values( sqnc , time_sqnc   ,  enroll_array(i)   , 1);
+end loop;
+exception
+when NO_DATA_FOUND then
+null;
+end;
+
+--PROCEDURE TO FETCH THE ATTENDANCE OF ALL THE STUDENT
+
+ procedure get_attendance(dname department.dept_name%type,nyear department_section.year%type ,
+ nsec department_section.sec%type,subcode subject.sub_code%type,attendance out sys_refcursor)
+ As
+ dno department.dept_no%type;
+ begin
+ select dept_no into dno from department where dept_name=dname;
+ open attendance for
+ select (select name from teacher where id=t.tid) as tname, 
+  class_date,start_time, end_time,enroll ,(select first_name  || '  ,  ' || last_name from student where enroll= s.enroll)as stname ,status
+  from  attendance_time a  inner join
+ student_attendance_list s on a.date_seq=s.attend_seq inner join teacher_schedule t on t.seq=s.teach_seq where enroll in ( select enroll from 
+ student  st where  t.sub_code=subcode and dept_no=dno and st.sec=nsec and st.year=nyear )  order by enroll;
+ exception
+when others THEN
+dbms_output.put_line(sqlerrm);
+ end;
+
+ end;
+
+
+
+2. 
+ create or replace package body STUDENT_ROUTINE_PACKAGE
+ As
+
+
+procedure execute_teacher_qry(ttid teacher.id%type, sub_ccode subject.sub_code%type, no out integer)
+AS
+begin
+ select seq into no from teacher_schedule where tid = ttid  and   sub_code = sub_ccode ;
+exception
+when no_data_found then
+no:=0;
+end;
+
+procedure execute_department_qry(nyear department_section.year%type ,nsec department_section.sec%type,dpt_no NUMBER, no out integer)
+AS
+begin
+select  dept_seq  into no from department_schedule where year=nyear   and sec=  nsec   and dept_no= dpt_no;
+exception
+when no_data_found then
+no:=0;
+end;
+
+
+
+
+
+ 
+--PROCEDURE TO FETCH THE WEEKLY ROTUNE AGAINST TEACHER NAME
+
+ procedure getClassRoutine(tname teacher.name%type ,routine out sys_refcursor) As 
+ 
+   cursor c1 is  select (select   name || ' ,  ' || teach.sub_code  from subject where sub_code=teach.sub_code ) as subject,
+   (select   sub_type from subject where sub_code=teach.sub_code ) as sub_type, 
+    year  , sec ,(select  dept_name  from department where department.dept_no=dept.dept_no) as dname,
+   day, period , start_time, end_time from teacher_schedule teach  inner join 
+   timetable timer on timer.teach_seq=teach.seq inner join department_schedule dept on dept.dept_seq=timer.dept_seq
+   where teach.tid= (  select id  from teacher where name=tname);
+   rec c1%rowtype; 
+
+   begin
+   open c1;
+  update routine_temp set period1=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period2=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) 
+ , period3=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period4=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period5=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period6=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ;
+   loop
+  fetch c1 into rec; 
+   exit when c1%notfound;
+   
+   update_routine( tname, rec.subject , rec.sub_type,rec.dname,rec.year,rec.sec,rec.start_time, rec.end_time,rec.period,rec.day)  ;
+
+     
+   end loop;
+   close c1;
+   open routine for 
+   select * from routine_temp;
+   end;
+
+
+
+procedure insert_routine(tname teacher.name%type,sub_ccode subject.sub_code%type,dname department.dept_name%type,nyear department_section.year%type ,nsec department_section.sec%type,
+day timetable.day%type ,  
+period timetable.period%type,
+start_time timetable.start_time%type ,
+end_time timetable.end_time%type) 
+As
+dpt_no department.dept_no%type;
+qry varchar2(500);
+ttid teacher.id%type;
+sqnc NUMBER:=0;
+teach_seq teacher_schedule.seq%type;
+dept_seq   department_schedule.dept_seq%type;
+sub subject.sub_code%type;
+begin
+
+ select dept_no into dpt_no from department where dept_name=dname;
+ select id into ttid from teacher where name=  tname  ;
+ select sub_code into sub from subject where sub_code=sub_ccode and dept_no=dpt_no;
+ execute_teacher_qry(ttid,sub_ccode,sqnc);
+ if (sqnc =0) then 
+ insert into teacher_schedule(tid,sub_code) values(  ttid  ,  sub_ccode );
+ teach_seq:=teacher_schedule_seq.currval;
+ else
+ teach_seq:=sqnc;
+ end if;
+
+sqnc:=0;
+execute_department_qry(nyear,nsec,dpt_no,sqnc); 
+if(sqnc=0) then
+ insert into department_schedule(year,sec,dept_no) values(  nyear  , nsec ,  dpt_no )  ;
+dept_seq:=department_schedule_seq.currval;
+else
+dept_seq:=sqnc;
+end if;  
+ insert into timetable values( teach_seq ,dept_seq,day,period ,start_time,end_time) ;
+exception
+when NO_DATA_FOUND then
+null;
+when others then
+null;
+end;
+
+--PROCEDURE TO FETCH THE ROUTINE BASED ON YEAR,SEC AND DEPATMENT_NAME
+  procedure getClassRoutine(dname department.dept_name%type,nyear department_section.year%type ,nsec department_section.sec%type,routine out sys_refcursor)
+  As
+  cursor c1 is  select (select   name  from teacher where id=teach.tid ) as name ,
+  (select     name || ' , ' ||  teach.sub_code    from subject where sub_code=teach.sub_code ) as subject,(select sub_type from subject where 
+  sub_code=teach.sub_code) as sub_type ,day,period,   start_time  ,end_time   from teacher_schedule teach inner join 
+   timetable timer on timer.teach_seq=teach.seq inner join department_schedule dept on dept.dept_seq=timer.dept_seq 
+   where dept.dept_no=(select dept_no  from department where dept_name=dname) and dept.year=nyear and dept.sec=nsec ;
+   dept_no department.dept_no%type;
+
+  rec c1%rowtype; 
+
+   begin
+   open c1;
+   update routine_temp set period1=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period2=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) 
+, period3=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period4=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period5=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ,period6=period('  ' ,'  ' ,'  ' ,'  ','  ','  ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ;  
+   loop
+   fetch c1 into rec; 
+   exit when c1%notfound;
+    update_routine(rec.name, rec.subject , rec.sub_type,dname,nyear,nsec,rec.start_time, rec.end_time,rec.period,rec.day);
+   end loop;
+   close c1;
+   open routine for 
+   select * from routine_temp;
+    end;
+
+procedure update_routine(tname teacher.name%type,subject subject.name%type,sub_type subject.sub_type%type,dname department.dept_name%type,year department_section.year%type ,sec department_section.sec%type,start_time timestamp,end_time timestamp,perio Integer,dayt varchar2)
+As
+begin
+   dbms_output.put_line('Enteref-----');
+if(perio=1) then
+update  routine_temp set period1=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+elsif(perio=2) then
+update  routine_temp set period2=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+elsif(perio=3) then
+update  routine_temp set period3=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+ 
+elsif(perio=4) then
+update  routine_temp set period4=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+ 
+elsif(perio=5) then
+update  routine_temp set period5=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+
+
+elsif(perio=6) then
+update  routine_temp set period6=period( tname, subject ,sub_type,dname,year,sec,start_time, end_time)  where day=dayt;
+ end if;     
+
+
+
+end;   
+
+end;
